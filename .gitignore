@@ -1,8 +1,11 @@
-app.spec
-app.spec
-build/app/Analysis-00.toc
-build/app/app.pkg
-/dist
-/build
-/build
-app.spec
+# PyInstaller build outputs
+build/
+dist/
+*.spec
+
+# Local SQLite databases
+*.db
+
+# Python cache files
+__pycache__/
+*.pyc
