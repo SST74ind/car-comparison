@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SahiChuno — Sahi Car. Sahi Faisla.</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .hidden-element { display: none !important; }
+        
+        /* Interactive Multi-Select Styling */
+        .selectable-car-card {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            position: relative;
+            border: 2px solid transparent !important;
+        }
+        .selectable-car-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
+        }
+        .selectable-car-card.selected-variant {
+            border-color: #3b4fd8 !important;
+            background-color: rgba(59, 79, 216, 0.02) !important;
+        }
+        .select-indicator {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 2px solid #cbd5e1;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: #fff;
+            transition: all 0.15s ease;
+        }
+        .selectable-car-card.selected-variant .select-indicator {
+            background: #3b4fd8;
+            border-color: #3b4fd8;
+        }
+
+        /* Floating Actions Compare Dock */
+        .compare-action-dock {
+            position: fixed;
+            bottom: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 600px;
+            background: var(--surface, #ffffff);
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.15);
+            border-radius: 16px;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 1050;
+            transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 1px solid var(--border, #e0e4f0);
+        }
+        .compare-action-dock.active {
+            bottom: 24px;
+        }
+        .dock-btn {
+            background: #3b4fd8;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .dock-btn:hover {
+            background: #2a3bb5;
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <a class="nav-logo" href="/">SahiChuno</a>
+    <ul class="nav-links">
+        <li><a href="#" id="navCompare" class="active" onclick="switchTab('compare')">Compare</a></li>
+        <li><a href="#" id="navFind" onclick="switchTab('find')">Find Your Car</a></li>
+    </ul>
+    <div class="nav-right">
+        <span class="badge-pill">170+ Variants</span>
+        <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">
+            <span id="themeLabel">Dark</span>
+        </button>
+    </div>
+</nav>
+
+<div class="hero">
+    <div class="hero-inner">
+        <div class="hero-tag">India's Car Comparison & Discovery Tool</div>
+        <h1>Sahi Car.<br><em>Sahi Faisla.</em></h1>
+        <p class="hero-sub">
+            Compare specs directly or state your custom lifestyle requirements to uncover your perfect vehicle match.
+        </p>
+    </div>
+</div>
+
+<div class="wrap">
+
+    <div id="compareViewTab">
+        <div class="card mb-4">
+            <div class="card-head">
+                <h2>Select Two Cars to Compare</h2>
+                <p>Search by brand, model, or variant name</p>
+            </div>
+            <div class="card-body">
+                <form action="/compare" method="GET" id="compareForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Car 1</label>
+                            <div class="search-wrap mb-2">
+                                <input type="text" id="search1" class="form-control" placeholder="e.g. Maruti Swift..." autocomplete="off">
+                                <div id="sug1" class="sug-box"></div>
+                            </div>
+                            <select name="car1" id="sel1" class="form-select" required>
+                                {% for car in cars %}
+                                <option value="{{ car.value }}" {% if compared and car.value == car1.Brand+'|'+car1.Model+'|'+car1.Variant %}selected{% endif %}>{{ car.display }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Car 2</label>
+                            <div class="search-wrap mb-2">
+                                <input type="text" id="search2" class="form-control" placeholder="e.g. Tata Nexon..." autocomplete="off">
+                                <div id="sug2" class="sug-box"></div>
+                            </div>
+                            <select name="car2" id="sel2" class="form-select" required>
+                                {% for car in cars %}
+                                <option value="{{ car.value }}" {% if compared and car.value == car2.Brand+'|'+car2.Model+'|'+car2.Variant %}selected{% endif %}>{{ car.display }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="calc-bar">
+                        <div class="calc-bar-head">
+                            <span class="calc-bar-title">Calculator Settings</span>
+                            <div class="seg-control">
+                                <button type="button" class="seg-btn active" id="qBtn" onclick="setMode('quick')">Quick</button>
+                                <button type="button" class="seg-btn" id="dBtn" onclick="setMode('detail')">Detailed — with Loan</button>
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Daily Driving (km)</label>
+                                <input type="number" name="daily_km" class="form-control" value="{{ daily_km if compared else 40 }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Fuel Price (Rs/litre)</label>
+                                <input type="number" name="fuel_price" class="form-control" value="{{ fuel_price if compared else 103 }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Years of Ownership</label>
+                                <input type="number" name="years" class="form-control" value="{{ years if compared else 5 }}">
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-1 detail-row" id="detailRow">
+                            <div class="col-md-4">
+                                <label class="form-label">Down Payment (%)</label>
+                                <input type="number" name="down_payment" class="form-control" value="{{ down_payment_pct if compared else 20 }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Loan Tenure (months)</label>
+                                <input type="number" name="loan_tenure" class="form-control" value="{{ loan_tenure if compared else 60 }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Interest Rate (%)</label>
+                                <input type="number" name="interest_rate" class="form-control" value="{{ interest_rate if compared else 9.5 }}" step="0.1">
+                            </div>
+                        </div>
+                        <input type="hidden" name="mode" id="modeInput" value="quick">
+                    </div>
+                    <button type="submit" class="btn-cta">Compare Now</button>
+                </form>
+            </div>
+        </div>
+
+        {% if compared %}
+        <div class="results" id="results">
+            <div class="card mb-4">
+                <div class="card-head">
+                    <h2>Running Cost Accumulation Over Time</h2>
+                    <p>Visualizing total expenditure over a 5-year driving trajectory timeline</p>
+                </div>
+                <div class="card-body">
+                    <div style="max-height: 320px; position: relative;">
+                        <canvas id="costTimelineChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-head">
+                    <h2>{{ car1.brand }} {{ car1.model }} vs {{ car2.brand }} {{ car2.model }}</h2>
+                    <p>Green = better in category &nbsp;|&nbsp; Yellow = equal &nbsp;|&nbsp; Red = lower</p>
+                </div>
+                <div class="card-body" style="padding:0">
+                    <div class="cmp-table-wrap">
+                        <table class="cmp-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:28%">Category</th>
+                                    <th>{{ car1.brand }} {{ car1.model }} <small>({{ car1.variant }})</small></th>
+                                    <th>{{ car2.brand }} {{ car2.model }} <small>({{ car2.variant }})</small></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="cat-label">Price Range</span></td>
+                                    <td class="{% if winners.price=='car1' %}win{% elif winners.price=='car2' %}lose{% else %}tie{% endif %}">Rs {{ '{:,.0f}'.format(car1.price_min) }} – Rs {{ '{:,.0f}'.format(car1.price_max) }}</td>
+                                    <td class="{% if winners.price=='car2' %}win{% elif winners.price=='car1' %}lose{% else %}tie{% endif %}">Rs {{ '{:,.0f}'.format(car2.price_min) }} – Rs {{ '{:,.0f}'.format(car2.price_max) }}</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="cat-label">Fuel Type</span></td>
+                                    <td>{{ car1.fuel_type }}</td>
+                                    <td>{{ car2.fuel_type }}</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="cat-label">Efficiency / Range</span></td>
+                                    <td class="{% if winners.mileage=='car1' %}win{% elif winners.mileage=='car2' %}lose{% else %}tie{% endif %}">
+                                        {% if car1.fuel_type | lower == 'electric' %}{{ car1.ev_range_km }} km Range{% else %}{{ car1.mileage_kmpl }} kmpl{% endif %}
+                                    </td>
+                                    <td class="{% if winners.mileage=='car2' %}win{% elif winners.mileage=='car1' %}lose{% else %}tie{% endif %}">
+                                        {% if car2.fuel_type | lower == 'electric' %}{{ car2.ev_range_km }} km Range{% else %}{{ car2.mileage_kmpl }} kmpl{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><span class="cat-label">Engine Capacity</span></td>
+                                    <td class="{% if winners.engine=='car1' %}win{% elif winners.engine=='car2' %}lose{% else %}tie{% endif %}">
+                                        {% if car1.fuel_type | lower == 'electric' %}Electric Motor{% else %}{{ car1.engine_cc }} cc{% endif %}
+                                    </td>
+                                    <td class="{% if winners.engine=='car2' %}win{% elif winners.engine=='car1' %}lose{% else %}tie{% endif %}">
+                                        {% if car2.fuel_type | lower == 'electric' %}Electric Motor{% else %}{{ car2.engine_cc }} cc{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><span class="cat-label">Power</span></td>
+                                    <td class="{% if winners.power=='car1' %}win{% elif winners.power=='car2' %}lose{% else %}tie{% endif %}">{{ car1.power_bhp }} bhp</td>
+                                    <td class="{% if winners.power=='car2' %}win{% elif winners.power=='car1' %}lose{% else %}tie{% endif %}">{{ car2.power_bhp }} bhp</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="cat-label">Torque</span></td>
+                                    <td class="{% if winners.torque=='car1' %}win{% elif winners.torque=='car2' %}lose{% else %}tie{% endif %}">{{ car1.torque_nm }} Nm</td>
+                                    <td class="{% if winners.torque=='car2' %}win{% elif winners.torque=='car1' %}lose{% else %}tie{% endif %}">{{ car2.torque_nm }} Nm</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="cat-label">Safety Rating</span></td>
+                                    <td class="{% if winners.safety=='car1' %}win{% elif winners.safety=='car2' %}lose{% else %}tie{% endif %}">{{ car1.safety_rating }} / 5</td>
+                                    <td class="{% if winners.safety=='car2' %}win{% elif winners.safety=='car1' %}lose{% else %}tie{% endif %}">{{ car2.safety_rating }} / 5</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="cat-label">Boot Space</span></td>
+                                    <td class="{% if winners.boot=='car1' %}win{% elif winners.boot=='car2' %}lose{% else %}tie{% endif %}">{{ car1.boot_space }} L</td>
+                                    <td class="{% if winners.boot=='car2' %}win{% elif winners.boot=='car1' %}lose{% else %}tie{% endif %}">{{ car2.boot_space }} L</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="cat-label">Key Features</span></td>
+                                    <td class="feat-cell">{{ car1.features | safe if car1.features else '' }}</td>
+                                    <td class="feat-cell">{{ car2.features | safe if car2.features else '' }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="calc-cards {% if mode=='detail' %}three{% else %}two{% endif %}">
+                <div class="calc-card">
+                    <div class="calc-card-title">Resale Value Estimation</div>
+                    <div class="calc-row">
+                        <div class="calc-name">{{ car1.brand }} {{ car1.model }}</div>
+                        <div class="calc-val val-green">Rs {{ '{:,.0f}'.format(resale1_3yr) }} <small class="text-muted">(3yr)</small></div>
+                        <div class="calc-val val-orange">Rs {{ '{:,.0f}'.format(resale1_5yr) }} <small class="text-muted">(5yr)</small></div>
+                    </div>
+                    <hr class="calc-divider">
+                    <div class="calc-row">
+                        <div class="calc-name">{{ car2.brand }} {{ car2.model }}</div>
+                        <div class="calc-val val-green">Rs {{ '{:,.0f}'.format(resale2_3yr) }} <small class="text-muted">(3yr)</small></div>
+                        <div class="calc-val val-orange">Rs {{ '{:,.0f}'.format(resale2_5yr) }} <small class="text-muted">(5yr)</small></div>
+                    </div>
+                </div>
+
+                <div class="calc-card">
+                    <div class="calc-card-title">Total Operational Cost</div>
+                    <div class="calc-row">
+                        <div class="calc-name">{{ car1.brand }} {{ car1.model }}</div>
+                        <div class="calc-val val-red">Rs {{ '{:,.0f}'.format(fuel_cost1) }}</div>
+                    </div>
+                    <hr class="calc-divider">
+                    <div class="calc-row">
+                        <div class="calc-name">{{ car2.brand }} {{ car2.model }}</div>
+                        <div class="calc-val val-red">Rs {{ '{:,.0f}'.format(fuel_cost2) }}</div>
+                    </div>
+                </div>
+
+                {% if mode == 'detail' %}
+                <div class="calc-card">
+                    <div class="calc-card-title">Estimated Monthly EMI</div>
+                    <div class="calc-row">
+                        <div class="calc-name">{{ car1.brand }} {{ car1.model }}</div>
+                        <div class="calc-val val-blue">Rs {{ '{:,.0f}'.format(emi1) }}/month</div>
+                    </div>
+                    <hr class="calc-divider">
+                    <div class="calc-row">
+                        <div class="calc-name">{{ car2.brand }} {{ car2.model }}</div>
+                        <div class="calc-val val-blue">Rs {{ '{:,.0f}'.format(emi2) }}/month</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div id="findCarViewTab" style="display: none;">
+        <div class="card mb-4">
+            <div class="card-head">
+                <h2>Find Your Perfect Car Match</h2>
+                <p>Click up to 2 cards in the results below to instantly compare them side-by-side.</p>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <label class="form-label d-flex justify-content-between">
+                            <span>Budget Range (Ex-Showroom)</span>
+                            <span class="fw-bold text-primary" id="budgetLbl">₹5 Lakhs - ₹50 Lakhs</span>
+                        </label>
+                        <div class="dual-range-wrapper">
+                            <div class="range-slider-track"></div>
+                            <input type="range" class="range-min" id="filterBudgetMin" min="300000" max="25000000" step="100000" value="500000" oninput="handleRangeInput()">
+                            <input type="range" class="range-max" id="filterBudgetMax" min="300000" max="25000000" step="100000" value="5000000" oninput="handleRangeInput()">
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Fuel Type Strategy</label>
+                        <select class="form-select" id="filterFuel" onchange="toggleFuelStrategy()">
+                            <option value="all">All Powertrains</option>
+                            <option value="petrol">Petrol Only</option>
+                            <option value="diesel">Diesel Only</option>
+                            <option value="hybrid">Strong Hybrid Only</option>
+                            <option value="electric">Electric (EV) Only</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6" id="mileageBox">
+                        <label class="form-label d-flex justify-content-between">
+                            <span>Minimum Fuel Economy</span>
+                            <span class="fw-bold text-success" id="mileageLbl">12 Kmpl</span>
+                        </label>
+                        <input type="range" class="form-range" id="filterMileage" min="8" max="28" step="1" value="12" oninput="triggerSmartFilter()">
+                    </div>
+
+                    <div class="col-md-6 hidden-element" id="evRangeBox">
+                        <label class="form-label d-flex justify-content-between">
+                            <span>Minimum Driving Range</span>
+                            <span class="fw-bold text-success" id="evRangeLbl">350 km</span>
+                        </label>
+                        <input type="range" class="form-range" id="filterEVRange" min="200" max="650" step="10" value="350" oninput="triggerSmartFilter()">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Car Category / Body Type</label>
+                        <select class="form-select" id="filterSegment" onchange="triggerSmartFilter()">
+                            <option value="all">All Form Factors</option>
+                            <option value="hatchback">Hatchback (Compact & City Cars)</option>
+                            <option value="sedan">Sedan (Comfort & Premium Executive)</option>
+                            <option value="suv">SUV (High Ground Clearance)</option>
+                            <option value="mpv">MPV (Multi-Purpose Family Carrier)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3" id="smartDiscoveryResultsGrid"></div>
+    </div>
+
+    <div id="compareDock" class="compare-action-dock">
+        <div>
+            <h5 style="margin:0; font-size:1.05rem; font-weight:700;" id="dockText">Selected 1 variant</h5>
+            <small class="text-muted" style="font-size:0.8rem;">Select one more to compare side-by-side.</small>
+        </div>
+        <button class="dock-btn" id="dockActionBtn" onclick="executeDockComparison()" disabled>Compare Selected</button>
+    </div>
+
+    <div class="footer">SahiChuno &nbsp;&bull;&nbsp; Market Data Evaluation Platform &nbsp;&bull;&nbsp; Built by SST74ind</div>
+</div>
+
+<script>
+let selectedVariants = [];
+
+function switchTab(targetTab) {
+    const compTab = document.getElementById('compareViewTab');
+    const findTab = document.getElementById('findCarViewTab');
+    const navComp = document.getElementById('navCompare');
+    const navFind = document.getElementById('navFind');
+
+    if (targetTab === 'find') {
+        compTab.style.display = 'none';
+        findTab.style.display = 'block';
+        navComp.classList.remove('active');
+        navFind.classList.add('active');
+        triggerSmartFilter();
+    } else {
+        compTab.style.display = 'block';
+        findTab.style.display = 'none';
+        navComp.classList.add('active');
+        navFind.classList.remove('active');
+        clearVariantSelections();
+    }
+}
+
+function toggleFuelStrategy() {
+    const fuel = document.getElementById('filterFuel').value;
+    const mileageBox = document.getElementById('mileageBox');
+    const evRangeBox = document.getElementById('evRangeBox');
+
+    if (fuel === 'electric') {
+        mileageBox.classList.add('hidden-element');
+        evRangeBox.classList.remove('hidden-element');
+    } else {
+        mileageBox.classList.remove('hidden-element');
+        evRangeBox.classList.add('hidden-element');
+    }
+    triggerSmartFilter();
+}
+
+function handleRangeInput() {
+    const minInput = document.getElementById('filterBudgetMin');
+    const maxInput = document.getElementById('filterBudgetMax');
+    
+    // Prevent handles from crossing over
+    if (parseInt(minInput.value) > parseInt(maxInput.value)) {
+        if (event.target.className === 'range-min') {
+            minInput.value = maxInput.value;
+        } else {
+            maxInput.value = minInput.value;
+        }
+    }
+    triggerSmartFilter();
+}
+
+async function triggerSmartFilter() {
+    clearVariantSelections();
+
+    const budgetMin = parseFloat(document.getElementById('filterBudgetMin').value);
+    const budgetMax = parseFloat(document.getElementById('filterBudgetMax').value);
+    const fuelVal = document.getElementById('filterFuel').value;
+    const segmentVal = document.getElementById('filterSegment').value;
+    const mileageVal = document.getElementById('filterMileage').value;
+    const evRangeVal = document.getElementById('filterEVRange').value;
+
+    const formatCurrencyText = (val) => {
+        return val >= 10000000 ? (val / 10000000).toFixed(2) + " Crore" : (val / 100000).toFixed(0) + " Lakhs";
+    };
+
+    document.getElementById('budgetLbl').textContent = `₹${formatCurrencyText(budgetMin)} - ₹${formatCurrencyText(budgetMax)}`;
+    document.getElementById('mileageLbl').textContent = mileageVal + " Kmpl";
+    document.getElementById('evRangeLbl').textContent = evRangeVal + " km Range";
+
+    let queryUrl = `/smart-find?budget_min=${budgetMin}&budget_max=${budgetMax}&fuel=${fuelVal}&segment=${segmentVal}`;
+    if (fuelVal === 'electric') {
+        queryUrl += `&ev_range=${evRangeVal}`;
+    } else {
+        queryUrl += `&mileage=${mileageVal}`;
+    }
+
+    const response = await fetch(queryUrl);
+    const carsList = await response.json();
+
+    const outputGrid = document.getElementById('smartDiscoveryResultsGrid');
+    
+    if (!carsList || carsList.length === 0) {
+        outputGrid.innerHTML = `
+            <div class="col-12 text-center py-5">
+                <h4 class="text-muted">No matching vehicles found in this range.</h4>
+                <p class="text-muted small">Try loosening your budget boundaries or filtering specs.</p>
+            </div>`;
+        return;
+    }
+
+    outputGrid.innerHTML = carsList.map(car => {
+        const passValue = `${car.brand}|${car.model}|${car.variant}`;
+        const formatPrice = (p) => p >= 10000000 ? (p / 10000000).toFixed(2) + " Cr" : (p / 100000).toFixed(2) + "L";
+
+        return `
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card h-100 selectable-car-card border-0 shadow-sm" 
+                 data-variant-id="${passValue}" 
+                 data-display-name="${car.brand} ${car.model} (${car.variant})"
+                 onclick="handleVariantCardClick(this)"
+                 style="background-color: var(--surface, #ffffff); padding: 20px; border-radius: 14px;">
+                
+                <div class="select-indicator">✓</div>
+                
+                <div class="d-flex justify-content-between align-items-start" style="padding-right: 25px;">
+                    <div>
+                        <h4 style="font-size: 1.1rem; font-weight:700; color: var(--text, #18192e); margin:0;">${car.brand} ${car.model}</h4>
+                        <small style="color: var(--text2, #58607a); opacity:0.8; font-weight: 600; text-transform: uppercase; font-size: 0.72rem;">${car.variant} &bull; ${car.segment}</small>
+                    </div>
+                    <span class="badge bg-success" style="font-size:0.78rem; padding: 5px 9px;">${car.safety} ★ Safety</span>
+                </div>
+                
+                <div class="my-3">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span style="color: var(--text2, #58607a);">Showroom Price:</span>
+                        <strong style="color: var(--accent, #3b4fd8);">₹${formatPrice(car.price_min)} - ₹${formatPrice(car.price_max)}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span style="color: var(--text2, #58607a);">Powertrain / Economy:</span>
+                        <strong class="text-success">${car.fuel} (${car.mileage})</strong>
+                    </div>
+                </div>
+                
+                <hr style="border-top:1px dashed var(--border, #e0e4f0); margin: 10px 0; opacity: 0.5;">
+                <div style="font-size: 0.76rem; color: var(--text2, #58607a); line-height: 1.45; background: rgba(0,0,0,0.02); padding: 8px; border-radius: 6px;">
+                    <strong>Trim Highlights:</strong> ${car.features || 'Standard Safety Pack'}
+                </div>
+            </div>
+        </div>
+    `}).join('');
+}
+
+function handleVariantCardClick(element) {
+    const variantId = element.getAttribute('data-variant-id');
+    const name = element.getAttribute('data-display-name');
+
+    if (element.classList.contains('selected-variant')) {
+        element.classList.remove('selected-variant');
+        selectedVariants = selectedVariants.filter(item => item.id !== variantId);
+    } else {
+        if (selectedVariants.length >= 2) {
+            alert("You can select a maximum of 2 variants for comparison. Deselect an existing item first.");
+            return;
+        }
+        element.classList.add('selected-variant');
+        selectedVariants.push({ id: variantId, name: name });
+    }
+
+    renderCompareDock();
+}
+
+function renderCompareDock() {
+    const dock = document.getElementById('compareDock');
+    const dockText = document.getElementById('dockText');
+    const dockActionBtn = document.getElementById('dockActionBtn');
+
+    if (selectedVariants.length === 0) {
+        dock.classList.remove('active');
+        return;
+    }
+
+    dock.classList.add('active');
+    if (selectedVariants.length === 1) {
+        dockText.textContent = `Selected: ${selectedVariants[0].name}`;
+        dockActionBtn.disabled = true;
+        dockActionBtn.textContent = "Select 1 More";
+    } else {
+        dockText.textContent = `Compare: ${selectedVariants[0].name} vs ${selectedVariants[1].name}`;
+        dockActionBtn.disabled = false;
+        dockActionBtn.textContent = "Compare Specs Now";
+    }
+}
+
+function clearVariantSelections() {
+    selectedVariants = [];
+    document.querySelectorAll('.selectable-car-card').forEach(card => {
+        card.classList.remove('selected-variant');
+    });
+    document.getElementById('compareDock').classList.remove('active');
+}
+
+function executeDockComparison() {
+    if (selectedVariants.length !== 2) return;
+    const url = `/compare?car1=${encodeURIComponent(selectedVariants[0].id)}&car2=${encodeURIComponent(selectedVariants[1].id)}&daily_km=40&fuel_price=103&years=5&down_payment=20&loan_tenure=60&interest_rate=9.5&mode=quick`;
+    window.location.href = url;
+}
+
+function toggleTheme() {
+    const html  = document.documentElement;
+    const dark  = html.getAttribute('data-theme') === 'dark';
+    const next  = dark ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('sc_theme', next);
+    document.getElementById('themeLabel').textContent = next === 'dark' ? 'Light' : 'Dark';
+}
+
+(function () {
+    const saved = localStorage.getItem('sc_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', saved);
+    const btn = document.getElementById('themeLabel');
+    if (btn) btn.textContent = saved === 'dark' ? 'Light' : 'Dark';
+})();
+
+function setMode(m) {
+    const row   = document.getElementById('detailRow');
+    const inp   = document.getElementById('modeInput');
+    const qBtn  = document.getElementById('qBtn');
+    const dBtn  = document.getElementById('dBtn');
+    if (m === 'detail') {
+        row.classList.add('show');
+        inp.value = 'detail';
+        qBtn.classList.remove('active');
+        dBtn.classList.add('active');
+    } else {
+        row.classList.remove('show');
+        inp.value = 'quick';
+        qBtn.classList.add('active');
+        dBtn.classList.remove('active');
+    }
+}
+{% if compared and mode == 'detail' %}setMode('detail');{% endif %}
+
+function initSearch(inputId, sugId, selId) {
+    const inp = document.getElementById(inputId);
+    const sug = document.getElementById(sugId);
+    const sel = document.getElementById(selId);
+
+    if(!inp) return;
+
+    inp.addEventListener('input', async function () {
+        const q = this.value.trim();
+        if (q.length < 2) { sug.innerHTML = ''; return; }
+        const res  = await fetch('/search?q=' + encodeURIComponent(q));
+        const data = await res.json();
+        sug.innerHTML = '';
+        data.forEach(item => {
+            const d = document.createElement('div');
+            d.className   = 'sug-item';
+            d.textContent = item.display;
+            d.onclick = () => {
+                inp.value = item.display;
+                for (const o of sel.options) {
+                    if (o.value === item.value) { o.selected = true; break; }
+                }
+                sug.innerHTML = '';
+            };
+            sug.appendChild(d);
+        });
+    });
+
+    document.addEventListener('click', e => {
+        if (!inp.contains(e.target)) sug.innerHTML = '';
+    });
+}
+initSearch('search1', 'sug1', 'sel1');
+initSearch('search2', 'sug2', 'sel2');
+
+{% if compared %}
+document.addEventListener('DOMContentLoaded', () => {
+    const ctx = document.getElementById('costTimelineChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'],
+            datasets: [
+                {
+                    label: "{{ car1.brand }} {{ car1.model }}",
+                    data: {{ chart_cost1 | tojson }},
+                    borderColor: '#3b4fd8',
+                    backgroundColor: 'rgba(59, 79, 216, 0.05)',
+                    borderWidth: 2.5,
+                    tension: 0.15,
+                    pointRadius: 4
+                },
+                {
+                    label: "{{ car2.brand }} {{ car2.model }}",
+                    data: {{ chart_cost2 | tojson }},
+                    borderColor: '#dc2626',
+                    backgroundColor: 'rgba(220, 38, 38, 0.05)',
+                    borderWidth: 2.5,
+                    tension: 0.15,
+                    pointRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: 'Accumulated Cost (Rs)' } }
+            }
+        }
+    });
+
+    const r = document.getElementById('results');
+    if (r) r.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+{% endif %}
+</script>
+</body>
+</html>
