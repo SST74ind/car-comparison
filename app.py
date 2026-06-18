@@ -1,9 +1,23 @@
 from flask import Flask, render_template, request, jsonify
 import sqlite3
 import os
+import sys
 
-app = Flask(__name__)
-DB_FILE = 'cars.db'
+# --- PYINSTALLER DYNAMIC PATH MANAGEMENT ---
+def get_resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
+# Tell Flask exactly where templates and styles live inside the temporary bundle
+app = Flask(__name__, 
+            template_folder=get_resource_path('templates'),
+            static_folder=get_resource_path('static'))
+
+# Keep the database file outside the exe in the same folder so it can read/write data persistently
+DB_FILE = os.path.join(os.path.dirname(sys.executable) if hasattr(sys, '_MEIPASS') else os.path.abspath("."), 'cars.db')
+# ------------------------------------------
 
 def get_db_connection():
     conn = sqlite3.connect(DB_FILE)
@@ -276,7 +290,7 @@ if __name__ == '__main__':
     from threading import Timer
 
     def open_browser():
-        webbrowser.open_browser("http://127.0.0.1:5000/")
+        webbrowser.open("http://127.0.0.1:5000/")
 
     # Delay browser launch by 1.5 seconds to give the Flask server time to spin up
     Timer(1.5, open_browser).start()
