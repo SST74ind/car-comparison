@@ -1,0 +1,11 @@
+# PyInstaller build outputs
+build/
+dist/
+*.spec
+
+# Local SQLite databases
+*.db
+
+# Python cache files
+__pycache__/
+*.pyc
