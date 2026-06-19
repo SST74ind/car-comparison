@@ -44,7 +44,6 @@ def init_db():
     ''')
     
     # Unabridged Master Catalog Matrix of the Indian Market
-    # Format: (Brand, Model, Segment, Base Price, Fuel, CC, BHP, Torque, Mileage, EV Range, Seating, Boot, Safety, Trims List)
     market_matrix = [
         # === MARUTI SUZUKI ===
         ("Maruti Suzuki", "Alto K10", "Hatchback", 399000, "Petrol", 998, 66, 89, 24.39, 0, 5, 214, 2, ["Std", "LXi", "VXi", "VXi+"]),
@@ -226,7 +225,6 @@ def init_db():
         ("Volvo", "XC60", "Luxury SUV", 6890000, "Petrol", 1969, 250, 350, 12.40, 0, 5, 483, 5, ["B5 Ultimate"])
     ]
     
-    # SYSTEMATIC MATRIX EXPLOSION LOOP
     for entry in market_matrix:
         brand, model, segment, base_price, fuel, cc, bhp, torque, mileage, ev_range, seating, boot, safety, trims = entry
         
@@ -241,7 +239,6 @@ def init_db():
                 
             trim_ev_range = ev_range + (idx * 35) if ev_range > 0 else 0
             
-            # Dynamic structural features generation string
             if fuel == "Electric":
                 if idx == 0:
                     feats = "Regenerative Braking • Digital instrument panel • Smart Keyless entry • Connected car tech"
@@ -383,15 +380,37 @@ def search_suggestions():
 def smart_find():
     budget_min = float(request.args.get('budget_min', 0))
     budget_max = float(request.args.get('budget_max', 250000000))
-    fuel = request.args.get('fuel', 'all')
+    
+    # FIX 1: If frontend is passing shorthand values (like 64 instead of 6400000), normalize to Lakhs
+    if budget_min > 0 and budget_min < 500:
+        budget_min = budget_min * 100000
+    if budget_max > 0 and budget_max < 500:
+        budget_max = budget_max * 100000
+
+    fuel = request.args.get('fuel', 'all').lower()
     segment = request.args.get('segment', 'all')
+    
+    mileage_min = request.args.get('mileage_min') or \
+                  request.args.get('min_mileage') or \
+                  request.args.get('fuel_economy') or \
+                  request.args.get('min_fuel_economy') or \
+                  request.args.get('economy')
+                  
+    mileage_min = float(mileage_min) if mileage_min else 0
     
     query = "SELECT * FROM cars WHERE price_min >= ? AND price_min <= ?"
     params = [budget_min, budget_max]
     
+    if mileage_min > 0:
+        query += " AND (mileage_kmpl >= ? OR ev_range_km >= ?)"
+        params.extend([mileage_min, mileage_min])
+
+    # FIX 2: Strip out "only" words (e.g., "diesel only" -> "diesel") to match db records perfectly
     if fuel != 'all':
+        clean_fuel = fuel.replace('only', '').strip()
         query += " AND LOWER(fuel_type) = ?"
-        params.append(fuel.lower())
+        params.append(clean_fuel)
+        
     if segment != 'all':
         query += " AND LOWER(segment) LIKE ?"
         params.append(f'%{segment.lower()}%')
@@ -416,6 +435,19 @@ def smart_find():
         })
     return jsonify(results)
 
+import webbrowser
+from threading import Timer
+
+def open_browser():
+    """Opens the local server URL in the default web browser."""
+    webbrowser.open_new("http://127.0.0.1:5000/")
+
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True)
+    
+    # Wait 1.5 seconds for the server to spin up, then open the browser automatically
+    Timer(1.5, open_browser).start()
+    
+    # CRITICAL: Change debug to False. 
+    # PyInstaller apps will break or loop infinitely if debug=True is left on!
+    app.run(debug=False, port=5000)

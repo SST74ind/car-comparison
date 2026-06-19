@@ -12,3 +12,5 @@ __pycache__/
 /build
 /build
 build/app/Analysis-00.toc
+/build
+/dist
